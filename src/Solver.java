@@ -2,11 +2,15 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
 public class Solver {
+
+    private static final int MAX_WORDS = 5;
 
     private static List<Character> left = Arrays.asList('m', 'h', 'l');
     private static List<Character> top = Arrays.asList('a', 'k', 'o');
@@ -14,9 +18,9 @@ public class Solver {
     private static List<Character> bottom = Arrays.asList('r', 'n', 'c');
     private static List<Character> all = new ArrayList<>();
 
-    private static Predicate<String> isLongEnough = word -> word.length() > 2;
+    private static Predicate<String> isLongEnough = word -> word.length() > 5;
 
-    private static List<String> words;
+    private static Map<Character, List<String>> words = new HashMap<>();
 
     private static List<List<String>> chains = new ArrayList<>();
 
@@ -25,19 +29,46 @@ public class Solver {
     // /////////////////////////////////////////////////////////////////////////
 
     public static void main(String[] args) throws Exception {
+        long start = System.currentTimeMillis();
+
         all.addAll(left);
         all.addAll(top);
         all.addAll(right);
         all.addAll(bottom);
 
-        words = Files.readAllLines(Paths.get("words")).stream()
+        List<String> wordList = Files.readAllLines(Paths.get("words")).stream()
                 .filter(isLongEnough)
                 .filter(word -> word.chars().noneMatch(c -> !all.contains((char) c)))
-                .filter(Solver::respectsLetterPositions).toList();
+                .filter(Solver::respectsLetterPositions)
+                .toList();
 
-        words.forEach(word -> chainWords(word, new ArrayList<>()));
+        System.out.println(String.format("Number of possible words: %d", wordList.size()));
+
+        wordList.forEach(word -> {
+            char firstLetter = word.charAt(0);
+            List<String> list = words.get(firstLetter);
+            if (list == null) {
+                list = new ArrayList<>();
+                list.add(word);
+                words.put(firstLetter, list);
+            } else {
+                list.add(word);
+            }
+        });
+
+        System.out.println("Words have been mapped");
+
+        wordList.forEach(word -> chainWords(word, new ArrayList<>()));
+
+        System.out.println(String.format("Number of chains: %d", chains.size()));
+
         chains.sort((c1, c2) -> Integer.compare(c1.size(), c2.size()));
+
+        System.out.println("Chains have been sorted");
+
         chains.stream().limit(10).forEach(chain -> System.out.println(String.join(" -> ", chain)));
+
+        System.out.println(System.currentTimeMillis() - start);
     }
 
     private static boolean respectsLetterPositions(String word) {
@@ -57,13 +88,12 @@ public class Solver {
         if (allLettersUsed(chain)) {
             chains.add(chain);
             return;
-        } else if (chain.size() == 5) {
+        } else if (chain.size() == MAX_WORDS) {
             return;
         }
 
-        words.stream()
-                .filter(otherWord -> !word.equals(otherWord) && otherWord.charAt(0) == word.charAt(word.length() - 1))
-                .forEach(otherWord -> chainWords(otherWord, new ArrayList<>(chain)));
+        words.get(word.charAt(word.length() - 1))
+                .forEach(w -> chainWords(w, new ArrayList<>(chain)));
     }
 
     private static boolean allLettersUsed(List<String> words) {
