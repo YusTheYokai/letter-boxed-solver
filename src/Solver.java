@@ -2,6 +2,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,7 @@ public class Solver {
 
     private static Map<Character, List<String>> words = new HashMap<>();
 
-    private static List<List<String>> chains = new ArrayList<>();
+    private static List<String[]> chains = new ArrayList<>();
 
     // /////////////////////////////////////////////////////////////////////////
     // Methods
@@ -36,15 +37,15 @@ public class Solver {
         all.addAll(right);
         all.addAll(bottom);
 
-        List<String> wordList = Files.readAllLines(Paths.get("words")).stream()
+        String[] wordArray = Files.readAllLines(Paths.get("words")).stream()
                 .filter(isLongEnough)
                 .filter(word -> word.chars().noneMatch(c -> !all.contains((char) c)))
                 .filter(Solver::respectsLetterPositions)
-                .toList();
+                .toArray(String[]::new);
 
-        System.out.println(String.format("Number of possible words: %d", wordList.size()));
+        System.out.println(String.format("Number of possible words: %d", wordArray.length));
 
-        wordList.forEach(word -> {
+        Arrays.stream(wordArray).forEach(word -> {
             char firstLetter = word.charAt(0);
             List<String> list = words.get(firstLetter);
             if (list == null) {
@@ -58,11 +59,11 @@ public class Solver {
 
         System.out.println("Words have been mapped");
 
-        wordList.forEach(word -> chainWords(word, new ArrayList<>()));
+        Arrays.stream(wordArray).forEach(word -> chainWords(word, new String[MAX_WORDS]));
 
         System.out.println(String.format("Number of chains: %d", chains.size()));
 
-        chains.sort((c1, c2) -> Integer.compare(c1.size(), c2.size()));
+        chains.sort((c1, c2) -> Integer.compare(Collections.frequency(Arrays.asList(c2), null), Collections.frequency(Arrays.asList(c1), null)));
 
         System.out.println("Chains have been sorted");
 
@@ -82,23 +83,32 @@ public class Solver {
                 || bottom.contains(c1) && bottom.contains(c2);
     }
 
-    private static void chainWords(String word, List<String> chain) {
-        chain.add(word);
+    private static void chainWords(String word, String[] chain) {
+        for (int i = 0; i < chain.length; i++) {
+            if (chain[i] == null) {
+                chain[i] = word;
+                break;
+            }
+        }
 
         if (allLettersUsed(chain)) {
             chains.add(chain);
             return;
-        } else if (chain.size() == MAX_WORDS) {
+        } else if (chain[MAX_WORDS - 1] != null) {
             return;
         }
 
         words.get(word.charAt(word.length() - 1))
-                .forEach(w -> chainWords(w, new ArrayList<>(chain)));
+                .forEach(w -> chainWords(w, Arrays.copyOf(chain, MAX_WORDS)));
     }
 
-    private static boolean allLettersUsed(List<String> words) {
+    private static boolean allLettersUsed(String[] chain) {
         List<Character> characters = new ArrayList<>();
-        for (String word : words) {
+        for (String word : chain) {
+            if (word == null) {
+                break;
+            }
+
             word.chars().forEach(c -> characters.add((char) c));
         }
 
